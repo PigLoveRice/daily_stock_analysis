@@ -771,9 +771,9 @@ Focus on index trend, liquidity, and sector rotation to shape the next-session t
         date_text = cls._compact_news_text(cls._get_news_field(item, "published_date"), limit=24)
         url = cls._compact_news_text(cls._get_news_field(item, "url"), limit=0)
         label_parts = [part for part in (source, date_text) if part]
-        label = " / ".join(label_parts) or "source"
+        label = " / ".join(label_parts)
         if url:
-            return f"[{label}]({url})"
+            return f"[{label or 'URL'}]({url})"
         return label
 
     @staticmethod
@@ -878,7 +878,7 @@ Focus on index trend, liquidity, and sector rotation to shape the next-session t
             snippet = self._compact_news_text(self._get_news_field(n, "snippet"), limit=220)
             source = self._compact_news_text(self._get_news_field(n, "source"), limit=60)
             published_date = self._compact_news_text(self._get_news_field(n, "published_date"), limit=30)
-            url = self._get_news_field(n, "url")
+            url = self._compact_news_text(self._get_news_field(n, "url"), limit=180)
             meta_parts = [part for part in (source, published_date) if part]
             meta = f" ({' / '.join(meta_parts)})" if meta_parts else ""
             url_line = f"\n   URL: {url}" if url else ""
