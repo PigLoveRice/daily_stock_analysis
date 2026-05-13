@@ -305,6 +305,19 @@ def _fetch_stock_list_from_api(url: Optional[str], *, timeout_seconds: float = 5
             method="GET",
         )
         with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
+            final_url = response.geturl() if hasattr(response, "geturl") else value
+            try:
+                final_parsed = urlparse(final_url or value)
+            except ValueError:
+                logger.warning("STOCK_LIST_FETCH_API 重定向到无效的 HTTP(S) URL，已忽略")
+                return []
+            final_scheme = (final_parsed.scheme or "").lower()
+            if final_scheme not in {"http", "https"} or not final_parsed.netloc:
+                logger.warning("STOCK_LIST_FETCH_API 重定向到无效的 HTTP(S) URL，已忽略")
+                return []
+            if not _is_safe_stock_list_fetch_url(final_parsed):
+                logger.warning("STOCK_LIST_FETCH_API 重定向到受限的元数据地址，已忽略")
+                return []
             charset = response.headers.get_content_charset() or "utf-8"
             payload = response.read(1024 * 1024 + 1)
         if len(payload) > 1024 * 1024:
