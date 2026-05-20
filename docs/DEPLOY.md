@@ -429,10 +429,10 @@ git push -u origin main
 
 #### 3. 验证 Workflow 文件
 
-确保 `.github/workflows/daily_analysis.yml` 文件存在且已提交：
+确保 `.github/workflows/00-daily-analysis.yml` 文件存在且已提交：
 
 ```bash
-git add .github/workflows/daily_analysis.yml
+git add .github/workflows/00-daily-analysis.yml
 git commit -m "Add GitHub Actions workflow"
 git push
 ```
@@ -440,7 +440,7 @@ git push
 #### 4. 手动测试运行
 
 1. 打开仓库页面 → **Actions** 标签
-2. 选择 **"每日股票分析"** workflow
+2. 选择 **"00 每日股票分析"** workflow
 3. 点击 **"Run workflow"** 按钮
 4. 选择运行模式：
    - `full` - 完整分析（股票+大盘）
@@ -458,7 +458,7 @@ git push
 
 默认配置：**周一到周五，北京时间 18:00** 自动执行
 
-修改时间：编辑 `.github/workflows/daily_analysis.yml` 中的 cron 表达式：
+修改时间：编辑 `.github/workflows/00-daily-analysis.yml` 中的 cron 表达式：
 
 ```yaml
 schedule:

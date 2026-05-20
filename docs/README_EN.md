@@ -132,7 +132,7 @@ Open the `Actions` tab and click `I understand my workflows, go ahead and enable
 
 #### 4. Manual Test
 
-`Actions` -> `Daily Stock Analysis` -> `Run workflow` -> `Run workflow`.
+`Actions` -> `00 每日股票分析` -> `Run workflow` -> `Run workflow`.
 
 #### Done
 
