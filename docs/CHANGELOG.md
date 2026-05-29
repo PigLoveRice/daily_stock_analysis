@@ -78,6 +78,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - 收敛 #1391 Phase 3 后端/API 与 Web 回归检查：`./scripts/ci_gate.sh`、`test_pipeline_market_phase_context.py`、`test_analysis_api_contract.py`、`test_analysis_history.py`、`npm run lint`、`npm run build`。
 - 执行 `python -c "import exchange_calendars as xcals; xcals.get_calendar('XSHG'); print('ok')"` 通过验证，以覆盖导入与交易日历初始化兼容性。
 - [修复] 加固 LLM channel base_url 校验，拒绝反斜杠、空白/控制字符和 userinfo 形式，避免与 `requests` 主机解析差异导致 SSRF 绕过。
+- [文档] 补充 LLM/base_url SSRF 收紧兼容说明：常见 OpenAI-compatible 与本地 Ollama 地址（如 `api.openai.com`、`api.deepseek.com`、`api.siliconflow.cn`、`dashscope.aliyuncs.com`、`http://host:port[/v1]`）仍可继续使用；如遇旧配置触发 `invalid_url`（如 `userinfo`、空白、反斜杠），需清理该 URL 或恢复为空值后重试，本次未改动 provider/model 默认值与外部 API 生命周期声明。
 - [改进] `scripts/fetch_tushare_stock_list.py` 可对 A 股中带 `XD`/`XR`/`DR`/`N`/`C` 前缀的名称进行回填修正，供自动补全刷新流程默认使用。
 - [修复] 股票自动补全索引生成缺少 `pypinyin` 时改为直接失败，避免写出缺失拼音字段的降级索引。
 - [修复] 归一腾讯实时行情成交量为股口径，避免量能变化倍数被放大并误导分析报告。
