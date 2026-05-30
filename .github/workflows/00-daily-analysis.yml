@@ -1,9 +1,12 @@
 name: 每日股票分析
 
 on:
-  # 定时触发 - 每天北京时间 18:00 (UTC 10:00)
+  # 定时触发 - 工作日北京时间每 5 分钟轻量检查一次，实际分析时间由 SCHEDULE_TIME 控制
   schedule:
-    - cron: '0 10 * * 1-5'     # 周一到周五，UTC 10:00 = 北京时间 18:00
+    # 北京时间 08:00-23:55，对应 UTC 周一至周五 00:00-15:55
+    - cron: '*/5 0-15 * * 1-5'
+    # 北京时间 00:00-07:55，对应 UTC 前一天 16:00-23:55
+    - cron: '*/5 16-23 * * 0-5'
   
   # 手动触发
   workflow_dispatch:
@@ -35,28 +38,88 @@ jobs:
     timeout-minutes: ${{ fromJSON(vars.ANALYSIS_TIMEOUT_MINUTES || '30') }}
     
     steps:
+      - name: 检查定时触发窗口
+        id: schedule_gate
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          SCHEDULE_TIME: ${{ vars.SCHEDULE_TIME || '18:00' }}
+        run: |
+          set -euo pipefail
+
+          if [ "$EVENT_NAME" != "schedule" ]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+            echo "reason=manual trigger" >> "$GITHUB_OUTPUT"
+            echo "手动触发，跳过 SCHEDULE_TIME 窗口检查"
+            exit 0
+          fi
+
+          schedule_time="${SCHEDULE_TIME:-18:00}"
+          if ! [[ "$schedule_time" =~ ^([01][0-9]|2[0-3]):[0-5][0-9]$ ]]; then
+            echo "::error::SCHEDULE_TIME 必须使用 HH:MM 格式，当前值: '$schedule_time'"
+            exit 1
+          fi
+
+          current_time="$(TZ='Asia/Shanghai' date '+%H:%M')"
+          current_minutes=$((10#${current_time%:*} * 60 + 10#${current_time#*:}))
+          target_minutes=$((10#${schedule_time%:*} * 60 + 10#${schedule_time#*:}))
+          delta_minutes=$((current_minutes - target_minutes))
+          target_weekday="$(TZ='Asia/Shanghai' date '+%u')"
+
+          if [ "$delta_minutes" -lt 0 ]; then
+            delta_minutes=$((delta_minutes + 1440))
+            target_weekday="$(TZ='Asia/Shanghai' date -d 'yesterday' '+%u')"
+          fi
+
+          if [ "$target_weekday" -gt 5 ]; then
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            echo "reason=not a Beijing weekday" >> "$GITHUB_OUTPUT"
+            echo "北京时间目标日期为周末，跳过定时分析"
+            exit 0
+          fi
+
+          if [ "$delta_minutes" -lt 5 ]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+            echo "reason=matched $schedule_time Beijing time window" >> "$GITHUB_OUTPUT"
+            echo "命中 SCHEDULE_TIME=$schedule_time，北京当前时间 $current_time，继续执行分析"
+          else
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            echo "reason=current Beijing time $current_time does not match $schedule_time" >> "$GITHUB_OUTPUT"
+            echo "未命中 SCHEDULE_TIME=$schedule_time，北京当前时间 $current_time，跳过本次定时分析"
+          fi
+
+      - name: 跳过未命中定时窗口
+        if: steps.schedule_gate.outputs.should_run != 'true'
+        run: |
+          echo "本次不执行分析：${{ steps.schedule_gate.outputs.reason }}"
+
       - name: 随机延迟（避免固定时间访问）
+        if: steps.schedule_gate.outputs.should_run == 'true'
         run: sleep $((RANDOM % 60))  # 随机延迟0-60秒启动
       
       - name: 检出代码
+        if: steps.schedule_gate.outputs.should_run == 'true'
         uses: actions/checkout@v5
       
       - name: 设置 Python 环境
+        if: steps.schedule_gate.outputs.should_run == 'true'
         uses: actions/setup-python@v6
         with:
           python-version: '3.11'
           cache: 'pip'
       
       - name: 安装依赖
+        if: steps.schedule_gate.outputs.should_run == 'true'
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
       
       - name: 创建必要目录
+        if: steps.schedule_gate.outputs.should_run == 'true'
         run: |
           mkdir -p data logs reports
       
       - name: 执行股票分析
+        if: steps.schedule_gate.outputs.should_run == 'true'
         env:
           # ==========================================
           # AI 配置
@@ -358,6 +421,7 @@ jobs:
           MARKET_REVIEW_ENABLED: ${{ vars.MARKET_REVIEW_ENABLED || secrets.MARKET_REVIEW_ENABLED || 'true' }}
           ANALYSIS_DELAY: ${{ vars.ANALYSIS_DELAY || secrets.ANALYSIS_DELAY || '0' }}
           TRADING_DAY_CHECK_ENABLED: ${{ vars.TRADING_DAY_CHECK_ENABLED || secrets.TRADING_DAY_CHECK_ENABLED || 'true' }}
+          SCHEDULE_TIME: ${{ vars.SCHEDULE_TIME || '18:00' }}
           
           # ==========================================
           # 系统配置
@@ -392,6 +456,7 @@ jobs:
           echo "🎯 运行模式: $MODE"
           echo "📊 自选股: $STOCK_LIST"
           echo "📝 报告类型: $REPORT_TYPE"
+          echo "⏱️ 定时配置: SCHEDULE_TIME=${SCHEDULE_TIME:-18:00}"
           echo ""
           echo "=========================================="
           echo "📋 配置检查"
@@ -469,7 +534,7 @@ jobs:
       
       - name: 上传分析报告
         uses: actions/upload-artifact@v6
-        if: always()
+        if: always() && steps.schedule_gate.outputs.should_run == 'true'
         with:
           name: analysis-reports-${{ github.run_number }}
           path: |
@@ -478,7 +543,7 @@ jobs:
           retention-days: 30
       
       - name: 显示运行结果
-        if: always()
+        if: always() && steps.schedule_gate.outputs.should_run == 'true'
         run: |
           echo ""
           echo "=========================================="

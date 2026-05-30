@@ -557,23 +557,37 @@ python main.py --workers 5            # Specify concurrency
 
 ### GitHub Actions Schedule
 
-Edit `.github/workflows/00-daily-analysis.yml`:
+The default workflow now performs a lightweight check every 5 minutes during
+Beijing workdays, then reads the repository variable `SCHEDULE_TIME` from
+`Settings -> Secrets and variables -> Actions -> Variables` to decide whether to
+continue with the analysis. When unset, it defaults to `18:00`.
+
+```text
+SCHEDULE_TIME=18:00
+```
+
+`SCHEDULE_TIME` uses `HH:MM` in Beijing time. Scheduled runs continue only within
+the 5-minute window after the configured time; non-matching runs stop before
+dependency installation. Manual `workflow_dispatch` runs bypass this gate.
+
+> GitHub Actions still parses `on.schedule.cron` from the workflow file; the cron
+> expression cannot directly read Repository Variables, Secrets, or `.env`
+> values. This workflow uses fixed low-cost polling plus a pre-run gate instead
+> of dynamically rewriting cron.
+
+The current polling cron covers the full Beijing workday:
 
 ```yaml
 schedule:
-  # UTC time, Beijing time = UTC + 8
-  - cron: '0 10 * * 1-5'   # Monday to Friday 18:00 (Beijing Time)
+  # Beijing 08:00-23:55, mapped to Monday-Friday 00:00-15:55 UTC
+  - cron: '*/5 0-15 * * 1-5'
+  # Beijing 00:00-07:55, mapped to the previous UTC day 16:00-23:55
+  - cron: '*/5 16-23 * * 0-5'
 ```
 
-Common time reference:
-
-| Beijing Time | UTC cron expression |
-|---------|----------------|
-| 09:30 | `'30 1 * * 1-5'` |
-| 12:00 | `'0 4 * * 1-5'` |
-| 15:00 | `'0 7 * * 1-5'` |
-| 18:00 | `'0 10 * * 1-5'` |
-| 21:00 | `'0 13 * * 1-5'` |
+If you need to reduce the number of workflow triggers instead of only skipping
+the analysis steps, edit `.github/workflows/00-daily-analysis.yml` back to a
+single cron point and convert the desired time to UTC manually.
 
 ### Local Scheduled Tasks
 

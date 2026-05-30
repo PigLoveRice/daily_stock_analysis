@@ -621,23 +621,33 @@ python main.py --workers 5            # 指定并发数
 
 ### GitHub Actions 定时
 
-编辑 `.github/workflows/00-daily-analysis.yml`:
+默认 workflow 会在工作日北京时间每 5 分钟进行一次轻量检查，并读取仓库
+`Settings → Secrets and variables → Actions → Variables` 中的 `SCHEDULE_TIME`
+决定是否继续执行分析。未配置时默认 `18:00`。
+
+```text
+SCHEDULE_TIME=18:00
+```
+
+`SCHEDULE_TIME` 使用 `HH:MM` 格式和北京时间。命中配置时间后的 5 分钟窗口内会继续执行；
+未命中时会在安装依赖前直接跳过。手动触发 `workflow_dispatch` 不受该窗口限制。
+
+> GitHub Actions 的 `on.schedule.cron` 仍然是 workflow 文件里的固定配置，不能直接读取
+> Repository Variables、Secrets 或 `.env` 动态替换。这里的实现是“固定低成本轮询 +
+> 运行前门控”，不是动态改写 cron。
+
+当前 workflow 的轮询 cron 覆盖工作日北京时间全天：
 
 ```yaml
 schedule:
-  # UTC 时间，北京时间 = UTC + 8
-  - cron: '0 10 * * 1-5'   # 周一到周五 18:00（北京时间）
+  # 北京时间 08:00-23:55，对应 UTC 周一至周五 00:00-15:55
+  - cron: '*/5 0-15 * * 1-5'
+  # 北京时间 00:00-07:55，对应 UTC 前一天 16:00-23:55
+  - cron: '*/5 16-23 * * 0-5'
 ```
 
-常用时间对照：
-
-| 北京时间 | UTC cron 表达式 |
-|---------|----------------|
-| 09:30 | `'30 1 * * 1-5'` |
-| 12:00 | `'0 4 * * 1-5'` |
-| 15:00 | `'0 7 * * 1-5'` |
-| 18:00 | `'0 10 * * 1-5'` |
-| 21:00 | `'0 13 * * 1-5'` |
+如需完全减少 workflow 触发次数，而不是仅跳过分析步骤，请自行把
+`.github/workflows/00-daily-analysis.yml` 改回单点 cron，并按 UTC 时间换算。
 
 #### GitHub Actions 非交易日手动运行（Issue #461 / #466）
 
