@@ -41,6 +41,11 @@
 
 默认发送路径沿用既有 sender 行为，不接入新增 renderer：飞书和 Telegram 继续使用原有兼容转换，企业微信、Slack 继续使用原有分片逻辑，避免改变线上可见报告版式。新增的渠道能力画像、PreparedMessage、renderer preset 和结构感知分片仅作为后续扩展基础；如需启用企业微信、飞书、Telegram、Slack 等渠道专用 renderer，应通过显式配置、真实发送验证和回归测试逐步接入。
 
+兼容性排除说明：
+- 本轮未改动 `src/notification_sender/wechat_sender.py`、`src/notification_sender/slack_sender.py`、`src/notification_sender/feishu_sender.py`、`src/notification_sender/telegram_sender.py` 的发送路径；现有 `send_to_*` 调用链（`src/notification.py -> sender method`）沿用既有行为。
+- `model_used` 只在报告渲染末尾展示，不参与 provider/model/base_url 的 runtime 选择、保存、清理或迁移。若某次 CI 扫描到“provider/API 兼容迁移”类关键词，命中范围应优先回归到测试夹具中的 `model_used` 示例与报告快照 fixture（`tests/fixtures/notification_reports/*.md`），以及 `src/notification.py` 对 `report_show_llm_model` 的仅展示开关逻辑。
+- `REPORT_SHOW_LLM_MODEL` 与 `report_renderer_enabled` 均为展示/降级策略开关：关闭仅影响报告可见结构，不会触发配置迁移或运行时参数回退；回退方式为恢复 `true`（或移除该项）或恢复默认配置。
+
 关联板块渲染保持报告正文生成阶段处理：当板块表现数据不可用且所有板块类型均缺失时，只输出一行板块名称；有板块类型或板块涨跌榜信号时继续使用表格。
 
 ## GitHub Actions 映射
