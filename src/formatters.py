@@ -410,9 +410,6 @@ def chunk_markdown_preserving_blocks(
                 split_at = safe_split
 
         chunk_body = remaining[:split_at].rstrip()
-        remaining = remaining[split_at:].lstrip()
-        full_chunk = prefix + chunk_body
-
         in_code = carry_lang is not None
         lang = carry_lang or ""
         for line in chunk_body.split("\n"):
@@ -425,6 +422,16 @@ def chunk_markdown_preserving_blocks(
                     in_code = True
                     tag = stripped[3:].strip()
                     lang = tag.split()[0] if tag else ""
+
+        next_remaining = remaining[split_at:]
+        if next_remaining.startswith("\n"):
+            next_remaining = next_remaining[1:]
+        elif not in_code and next_remaining.startswith(" "):
+            line_start = remaining.rfind("\n", 0, split_at) + 1
+            if remaining[line_start:split_at].strip(" \t"):
+                next_remaining = next_remaining[1:]
+        remaining = next_remaining
+        full_chunk = prefix + chunk_body
 
         if in_code:
             full_chunk += fence_close

@@ -211,6 +211,56 @@ class TestChunkMarkdownPreservingBlocks(unittest.TestCase):
         self.assertTrue(any(body.endswith("```") for body in bodies[:-1]))
         self.assertTrue(any(body.startswith("```python\n") for body in bodies[1:]))
 
+    def test_preserves_indentation_when_carrying_fenced_code(self):
+        text = (
+            "## Report\n\n"
+            "```python\n"
+            + "\n".join(f"    print({i})" for i in range(20))
+            + "\n```\n\n"
+            "Done"
+        )
+
+        chunks = chunk_markdown_preserving_blocks(text, 120)
+
+        carried_bodies = [
+            self._strip_chunk_suffix(chunk)
+            for chunk in chunks[1:]
+            if self._strip_chunk_suffix(chunk).startswith("```python\n")
+        ]
+        self.assertTrue(carried_bodies)
+        self.assertTrue(
+            any(body.startswith("```python\n    print(") for body in carried_bodies)
+        )
+        self.assertFalse(
+            any(body.startswith("```python\nprint(") for body in carried_bodies)
+        )
+
+    def test_preserves_space_delimiter_inside_fenced_code(self):
+        text = "```python\n" + "value =" + (" item" * 30) + "\n```"
+
+        chunks = chunk_markdown_preserving_blocks(text, 70)
+
+        carried_bodies = [
+            self._strip_chunk_suffix(chunk)
+            for chunk in chunks[1:]
+            if self._strip_chunk_suffix(chunk).startswith("```python\n")
+        ]
+        self.assertTrue(any(body.startswith("```python\n item") for body in carried_bodies))
+        self.assertFalse(any(body.startswith("```python\nitem") for body in carried_bodies))
+
+    def test_preserves_nested_list_indentation_after_split(self):
+        text = (
+            "- parent with enough words here\n"
+            "  - nested child keeps indentation after chunking "
+            + ("word " * 20)
+        )
+
+        chunks = chunk_markdown_preserving_blocks(text, 70)
+
+        bodies = [self._strip_chunk_suffix(chunk) for chunk in chunks]
+        self.assertTrue(any(body.startswith("  - nested child") for body in bodies[1:]))
+        self.assertFalse(any(body.startswith("- nested child") for body in bodies[1:]))
+
     def test_avoids_splitting_inside_inline_code(self):
         text = "Intro " + ("word " * 8) + "`inline code with spaces and (parens)` tail " + ("more " * 20)
 
