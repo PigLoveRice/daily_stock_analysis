@@ -200,7 +200,7 @@ function formatEnvBackupFilename(isDesktopRuntime: boolean) {
   return `${isDesktopRuntime ? 'dsa-desktop-env' : 'dsa-env'}_${date}_${time}.env`;
 }
 
-const TRUSTED_ALPHASIFT_INSTALL_SPEC = 'git+https://github.com/ZhuLinsen/alphasift.git';
+const TRUSTED_ALPHASIFT_INSTALL_SPEC = 'git+https://github.com/ZhuLinsen/alphasift.git@2c76b2b6074ae3bae01d52e5e830a4af3e3246b2';
 
 const SettingsPage: React.FC = () => {
   const { authEnabled, passwordChangeable } = useAuth();

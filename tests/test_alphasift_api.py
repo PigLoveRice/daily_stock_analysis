@@ -16,9 +16,9 @@ except ModuleNotFoundError:
     sys.modules["litellm"] = MagicMock()
 
 from api.v1.endpoints import alphasift as alphasift_endpoint
-from src.config import Config
+from src.config import Config, DEFAULT_ALPHASIFT_INSTALL_SPEC
 
-DEFAULT_ALPHASIFT_TEST_SPEC = "git+https://github.com/ZhuLinsen/alphasift.git"
+DEFAULT_ALPHASIFT_TEST_SPEC = DEFAULT_ALPHASIFT_INSTALL_SPEC
 
 
 def _alphasift_unavailable() -> HTTPException:
@@ -63,6 +63,12 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
 
     def _strategies(self, config: Config):
         return alphasift_endpoint.alphasift_strategies(config=config)
+
+    def test_default_install_spec_is_commit_pinned(self) -> None:
+        self.assertRegex(
+            DEFAULT_ALPHASIFT_TEST_SPEC,
+            r"^git\+https://github\.com/ZhuLinsen/alphasift\.git@[0-9a-f]{40}$",
+        )
 
     def test_status_defaults_to_disabled(self) -> None:
         config = self._config(enabled=False)

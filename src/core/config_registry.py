@@ -10,7 +10,11 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any, Dict, List, Optional
 
-from src.config import AGENT_CONTEXT_COMPRESSION_PROFILES, AGENT_MAX_STEPS_DEFAULT
+from src.config import (
+    AGENT_CONTEXT_COMPRESSION_PROFILES,
+    AGENT_MAX_STEPS_DEFAULT,
+    DEFAULT_ALPHASIFT_INSTALL_SPEC,
+)
 from src.notification_noise import NOTIFICATION_SEVERITIES
 from src.notification_routing import ROUTABLE_NOTIFICATION_CHANNELS
 
@@ -510,13 +514,13 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "is_sensitive": True,
         "is_required": False,
         "is_editable": True,
-        "default_value": "git+https://github.com/ZhuLinsen/alphasift.git",
+        "default_value": DEFAULT_ALPHASIFT_INSTALL_SPEC,
         "options": [],
         "validation": {},
         "display_order": 18,
         "help_key": "settings.data_source.ALPHASIFT_INSTALL_SPEC",
         "examples": [
-            "ALPHASIFT_INSTALL_SPEC=git+https://github.com/ZhuLinsen/alphasift.git",
+            f"ALPHASIFT_INSTALL_SPEC={DEFAULT_ALPHASIFT_INSTALL_SPEC}",
         ],
         "docs": [
             {
