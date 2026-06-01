@@ -14,10 +14,11 @@ from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from api.deps import get_config_dep
+from src.auth import COOKIE_NAME, is_auth_enabled, refresh_auth_state, verify_session
 from src.config import Config, DEFAULT_ALPHASIFT_INSTALL_SPEC
 
 router = APIRouter()
@@ -63,9 +64,12 @@ def alphasift_status(config: Config = Depends(get_config_dep)) -> Dict[str, Any]
 
 
 @router.get("/strategies")
-def alphasift_strategies(config: Config = Depends(get_config_dep)) -> Dict[str, Any]:
+def alphasift_strategies(
+    request: Request,
+    config: Config = Depends(get_config_dep),
+) -> Dict[str, Any]:
     _ensure_alphasift_enabled(config)
-    _ensure_alphasift_ready(config)
+    _ensure_alphasift_ready(config, request=request)
     strategies = _list_strategies()
     return {
         "enabled": True,
@@ -76,8 +80,10 @@ def alphasift_strategies(config: Config = Depends(get_config_dep)) -> Dict[str, 
 
 @router.post("/install")
 def alphasift_install(
+    request: Request,
     config: Config = Depends(get_config_dep),
 ) -> Dict[str, Any]:
+    _ensure_alphasift_install_access(request)
     _ensure_alphasift_enabled(config)
     return _install_alphasift(config)
 
@@ -166,10 +172,11 @@ def _validate_install_spec(raw_install_spec: str) -> str:
 @router.post("/screen")
 def alphasift_screen(
     request: AlphaSiftScreenRequest,
+    http_request: Request,
     config: Config = Depends(get_config_dep),
 ) -> Dict[str, Any]:
     _ensure_alphasift_enabled(config)
-    _ensure_alphasift_ready(config)
+    _ensure_alphasift_ready(config, request=http_request)
     _ensure_supported_market(request.market)
     _ensure_supported_strategy(request.strategy)
 
@@ -230,10 +237,38 @@ def _ensure_alphasift_enabled(config: Config) -> None:
         )
 
 
-def _ensure_alphasift_ready(config: Config) -> None:
+def _ensure_alphasift_ready(config: Config, *, request: Request) -> None:
     if _is_alphasift_available():
         return
+    _ensure_alphasift_install_access(request)
     _install_alphasift(config)
+
+
+def _ensure_alphasift_install_access(request: Request) -> None:
+    if os.getenv("DSA_DESKTOP_MODE") == "true":
+        return
+
+    refresh_auth_state()
+    if not is_auth_enabled():
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "alphasift_install_access_denied",
+                "message": "AlphaSift 自动安装仅允许桌面模式或已启用管理员认证的会话。请先启用管理员认证后重试。",
+            },
+        )
+
+    cookie_val = request.cookies.get(COOKIE_NAME)
+    if cookie_val and verify_session(cookie_val):
+        return
+
+    raise HTTPException(
+        status_code=401,
+        detail={
+            "error": "alphasift_install_access_denied",
+            "message": "AlphaSift 自动安装需要有效管理员会话。",
+        },
+    )
 
 
 def _is_alphasift_available() -> bool:

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 import sys
 import unittest
 from types import SimpleNamespace
@@ -55,14 +56,19 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
     def _config(self, *, enabled: bool, install_spec: str = DEFAULT_ALPHASIFT_TEST_SPEC) -> Config:
         return Config(alphasift_enabled=enabled, alphasift_install_spec=install_spec)
 
+    @staticmethod
+    def _request(cookies=None) -> SimpleNamespace:
+        return SimpleNamespace(cookies=cookies or {})
+
     def _screen(self, config: Config, **kwargs):
         return alphasift_endpoint.alphasift_screen(
             alphasift_endpoint.AlphaSiftScreenRequest(**kwargs),
+            http_request=self._request(),
             config=config,
         )
 
     def _strategies(self, config: Config):
-        return alphasift_endpoint.alphasift_strategies(config=config)
+        return alphasift_endpoint.alphasift_strategies(request=self._request(), config=config)
 
     def test_default_install_spec_is_commit_pinned(self) -> None:
         self.assertRegex(
@@ -206,6 +212,7 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
         fake_module = _make_adapter_module()
 
         with (
+            patch.dict(os.environ, {"DSA_DESKTOP_MODE": "true"}, clear=False),
             patch("api.v1.endpoints.alphasift._is_alphasift_available", return_value=False),
             patch("api.v1.endpoints.alphasift._install_alphasift") as install_mock,
             patch("api.v1.endpoints.alphasift._import_alphasift", return_value=fake_module),
@@ -229,6 +236,7 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
         config = self._config(enabled=True)
 
         with (
+            patch.dict(os.environ, {"DSA_DESKTOP_MODE": "true"}, clear=False),
             patch("api.v1.endpoints.alphasift._is_alphasift_available", return_value=False),
             patch("api.v1.endpoints.alphasift._install_alphasift", side_effect=lambda _config: _raise_alphasift_unavailable()) as install_mock,
         ):
@@ -239,15 +247,58 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
         self.assertEqual(caught.exception.detail["error"], "alphasift_unavailable")
         install_mock.assert_called_once_with(config)
 
+    def test_install_rejects_spoofed_localhost_without_admin_session(self) -> None:
+        config = self._config(enabled=True)
+        request = SimpleNamespace(
+            cookies={alphasift_endpoint.COOKIE_NAME: "invalid-session"},
+            url=SimpleNamespace(hostname="localhost"),
+            client=SimpleNamespace(host="127.0.0.1"),
+        )
+
+        with (
+            patch.dict(os.environ, {"DSA_DESKTOP_MODE": "false"}, clear=False),
+            patch("api.v1.endpoints.alphasift.refresh_auth_state") as refresh_mock,
+            patch("api.v1.endpoints.alphasift.is_auth_enabled", return_value=True),
+            patch("api.v1.endpoints.alphasift.verify_session", return_value=False) as verify_session_mock,
+            patch("api.v1.endpoints.alphasift.subprocess.run") as run_mock,
+        ):
+            with self.assertRaises(HTTPException) as caught:
+                alphasift_endpoint.alphasift_install(request=request, config=config)
+
+        self.assertEqual(caught.exception.status_code, 401)
+        self.assertEqual(caught.exception.detail["error"], "alphasift_install_access_denied")
+        refresh_mock.assert_called_once()
+        verify_session_mock.assert_called_once_with("invalid-session")
+        run_mock.assert_not_called()
+
+    def test_install_allows_valid_admin_session_outside_desktop_mode(self) -> None:
+        config = self._config(enabled=True)
+        request = self._request({alphasift_endpoint.COOKIE_NAME: "valid-session"})
+
+        with (
+            patch.dict(os.environ, {"DSA_DESKTOP_MODE": "false"}, clear=False),
+            patch("api.v1.endpoints.alphasift.refresh_auth_state") as refresh_mock,
+            patch("api.v1.endpoints.alphasift.is_auth_enabled", return_value=True),
+            patch("api.v1.endpoints.alphasift.verify_session", return_value=True) as verify_session_mock,
+            patch("api.v1.endpoints.alphasift._install_alphasift", return_value={"installed": True}) as install_mock,
+        ):
+            payload = alphasift_endpoint.alphasift_install(request=request, config=config)
+
+        self.assertEqual(payload["installed"], True)
+        refresh_mock.assert_called_once()
+        verify_session_mock.assert_called_once_with("valid-session")
+        install_mock.assert_called_once_with(config)
+
     def test_install_rejects_when_disabled_without_side_effects(self) -> None:
         config = self._config(enabled=False)
 
         with (
+            patch.dict(os.environ, {"DSA_DESKTOP_MODE": "true"}, clear=False),
             patch("api.v1.endpoints.alphasift.subprocess.run") as run_mock,
             patch("api.v1.endpoints.alphasift._import_alphasift") as import_mock,
         ):
             with self.assertRaises(HTTPException) as caught:
-                alphasift_endpoint.alphasift_install(config=config)
+                alphasift_endpoint.alphasift_install(request=self._request(), config=config)
 
         self.assertEqual(caught.exception.status_code, 403)
         self.assertEqual(caught.exception.detail["error"], "alphasift_disabled")
@@ -259,6 +310,7 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
         completed = SimpleNamespace(returncode=0, stdout="installed", stderr="")
 
         with (
+            patch.dict(os.environ, {"DSA_DESKTOP_MODE": "true"}, clear=False),
             patch("api.v1.endpoints.alphasift._is_alphasift_available", side_effect=[False, True]),
             patch(
                 "api.v1.endpoints.alphasift._call_alphasift_status",
@@ -267,7 +319,7 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
             patch("api.v1.endpoints.alphasift.subprocess.run", return_value=completed) as run_mock,
             patch("api.v1.endpoints.alphasift._get_dsa_adapter", return_value=_make_adapter_module()),
         ):
-            payload = alphasift_endpoint.alphasift_install(config=config)
+            payload = alphasift_endpoint.alphasift_install(request=self._request(), config=config)
 
         self.assertEqual(payload["installed"], True)
         self.assertEqual(payload["already_installed"], False)
@@ -284,6 +336,7 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
         completed = SimpleNamespace(returncode=0, stdout="installed", stderr="")
 
         with (
+            patch.dict(os.environ, {"DSA_DESKTOP_MODE": "true"}, clear=False),
             patch(
                 "api.v1.endpoints.alphasift._call_alphasift_status",
                 side_effect=[
@@ -295,7 +348,7 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
             patch("api.v1.endpoints.alphasift._get_dsa_adapter") as get_adapter_mock,
         ):
             with self.assertRaises(HTTPException) as caught:
-                alphasift_endpoint.alphasift_install(config=config)
+                alphasift_endpoint.alphasift_install(request=self._request(), config=config)
 
         self.assertEqual(caught.exception.status_code, 424)
         self.assertEqual(caught.exception.detail["error"], "alphasift_unavailable")
@@ -306,11 +359,12 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
         config = self._config(enabled=True, install_spec="git+https://example.com/private/alphasift.git")
 
         with (
+            patch.dict(os.environ, {"DSA_DESKTOP_MODE": "true"}, clear=False),
             patch("api.v1.endpoints.alphasift._is_alphasift_available", return_value=False),
             patch("api.v1.endpoints.alphasift.subprocess.run") as run_mock,
         ):
             with self.assertRaises(HTTPException) as caught:
-                alphasift_endpoint.alphasift_install(config=config)
+                alphasift_endpoint.alphasift_install(request=self._request(), config=config)
 
         self.assertEqual(caught.exception.status_code, 403)
         self.assertEqual(caught.exception.detail["error"], "alphasift_install_spec_not_allowed")
@@ -376,6 +430,7 @@ class AlphaSiftOpportunitiesApiTestCase(unittest.TestCase):
         fake_module = _make_adapter_module(screen=MagicMock(return_value={"candidates": []}))
 
         with (
+            patch.dict(os.environ, {"DSA_DESKTOP_MODE": "true"}, clear=False),
             patch("api.v1.endpoints.alphasift._is_alphasift_available", return_value=False),
             patch("api.v1.endpoints.alphasift._install_alphasift") as install_mock,
             patch("api.v1.endpoints.alphasift._import_alphasift", return_value=fake_module),
