@@ -845,4 +845,94 @@ describe('HomePage', () => {
     expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
     expect(navigateMock).not.toHaveBeenCalled();
   });
+
+  it('clears live market review output when switching to a history report', async () => {
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 1,
+      page: 1,
+      limit: 20,
+      items: [historyItem],
+    });
+    vi.mocked(historyApi.getStockBarList).mockResolvedValue({
+      total: 2,
+      items: [
+        {
+          id: 2,
+          stockCode: 'MARKET',
+          stockName: '大盘复盘',
+          sentimentScore: 50,
+          operationAdvice: '查看复盘',
+          analysisCount: 1,
+          lastAnalysisTime: '2026-03-18T08:30:00Z',
+          reportType: 'market_review',
+        },
+        {
+          id: 1,
+          stockCode: '600519',
+          stockName: '贵州茅台',
+          sentimentScore: 82,
+          operationAdvice: '买入',
+          analysisCount: 1,
+          lastAnalysisTime: '2026-03-18T08:00:00Z',
+          reportType: 'detailed',
+        },
+      ],
+    });
+    vi.mocked(historyApi.getDetail).mockImplementation((recordId: number) => {
+      if (recordId === 2) {
+        return Promise.resolve(marketReviewHistoryReport);
+      }
+      return Promise.resolve(historyReport);
+    });
+    vi.mocked(historyApi.getMarkdown).mockResolvedValue([
+      '# 大盘复盘详情',
+      '',
+      '## 市场情绪与赚钱效应',
+      '',
+      '**赚钱效应** 改善',
+      '',
+      '## 行业/主题轮动',
+      '',
+      '| 方向 | 状态 |',
+      '| --- | --- |',
+      '| 半导体 | 轮动增强 |',
+    ].join('\n'));
+    vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
+      status: 'accepted',
+      sendNotification: true,
+      message: '大盘复盘任务已提交',
+      taskId: 'task-1',
+    });
+    vi.mocked(analysisApi.getStatus).mockResolvedValue({
+      taskId: 'task-1',
+      status: 'completed',
+      marketReviewReport: '市场复盘报告示例文本',
+    });
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText('趋势维持强势');
+
+    fireEvent.click(screen.getByRole('button', { name: '大盘复盘' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('大盘复盘已完成')).toBeInTheDocument();
+      expect(screen.getByText('市场复盘报告示例文本')).toBeInTheDocument();
+    });
+
+    const marketHistoryButton = screen.getByRole('button', { name: /MARKET/ });
+    fireEvent.click(marketHistoryButton);
+
+    await waitFor(() => {
+      expect(screen.queryByText('市场复盘报告示例文本')).not.toBeInTheDocument();
+      expect(screen.queryByText('大盘复盘已完成')).not.toBeInTheDocument();
+    });
+    expect(await screen.findByText('大盘复盘摘要')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '市场情绪与赚钱效应' })).toBeInTheDocument();
+    expect(vi.mocked(historyApi.getDetail)).toHaveBeenCalledWith(2);
+  });
 });
