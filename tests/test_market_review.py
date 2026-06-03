@@ -128,8 +128,8 @@ class MarketReviewLocalizationTestCase(unittest.TestCase):
             market_review_module,
             "MarketAnalyzer",
             side_effect=[cn_analyzer, hk_analyzer, us_analyzer],
-        ), patch.object(market_review_module, "_persist_market_review_history"):
-            result = run_market_review(notifier, send_notification=False)
+        ), patch.object(market_review_module, "_persist_market_review_history") as persist_history:
+            result = run_market_review(notifier, send_notification=True)
 
         self.assertIn("# A-share Market Recap\n\nCN body", result)
         self.assertIn("# HK Market Recap\n\nHK body", result)
@@ -137,7 +137,17 @@ class MarketReviewLocalizationTestCase(unittest.TestCase):
         self.assertIn("# US Market Recap\n\nUS body", result)
         saved_content = notifier.save_report_to_file.call_args.args[0]
         self.assertTrue(saved_content.startswith("# 🎯 Market Review\n\n"))
-        notifier.send.assert_not_called()
+        self.assertIn("# A-share Market Recap\n\nCN body", saved_content)
+        self.assertIn("> Next market recap follows", saved_content)
+        self.assertIn("# HK Market Recap\n\nHK body", saved_content)
+        self.assertIn("# US Market Recap\n\nUS body", saved_content)
+        self.assertIn(
+            "# A-share Market Recap\n\nCN body",
+            persist_history.call_args.kwargs["markdown_report"],
+        )
+        sent_content = notifier.send.call_args.args[0]
+        self.assertTrue(sent_content.startswith("🎯 Market Review\n\n"))
+        self.assertIn("# US Market Recap\n\nUS body", sent_content)
 
     def test_run_market_review_comma_joined_subset_cn_us(self) -> None:
         """Regression: compute_effective_region("both", {"cn","us"}) -> "cn,us"

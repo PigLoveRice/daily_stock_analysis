@@ -178,6 +178,7 @@ const HomePage: React.FC = () => {
   }, [analysisSkills, selectedStrategyId]);
 
   const reportLanguage = normalizeReportLanguage(selectedReport?.meta.reportLanguage);
+  const liveMarketReviewLanguage = normalizeReportLanguage(marketReviewPayload?.language);
   const reportText = getReportText(reportLanguage);
   const isMarketReviewHistoryReport = selectedReport?.meta.reportType === 'market_review';
   const isHistoryTrendUnavailable = !selectedReport || selectedReport.meta.reportType === 'market_review'
@@ -774,7 +775,7 @@ const HomePage: React.FC = () => {
               <MarketReviewReportView
                 content={marketReviewReport}
                 payload={marketReviewPayload}
-                reportLanguage="zh"
+                reportLanguage={liveMarketReviewLanguage}
                 className="mb-3"
               />
             ) : null}

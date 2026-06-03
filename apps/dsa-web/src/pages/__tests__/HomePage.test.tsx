@@ -290,6 +290,51 @@ describe('HomePage', () => {
     expect(analysisApi.getStatus).toHaveBeenCalledWith('task-1');
   });
 
+  it('uses the payload language for live market review controls', async () => {
+    vi.mocked(historyApi.getList).mockResolvedValue({
+      total: 0,
+      page: 1,
+      limit: 20,
+      items: [],
+    });
+    vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
+      status: 'accepted',
+      sendNotification: true,
+      message: 'Market review task submitted',
+      taskId: 'task-1',
+    });
+    vi.mocked(analysisApi.getStatus).mockResolvedValue({
+      taskId: 'task-1',
+      status: 'completed',
+      marketReviewReport: '# US Market Recap\n\n## Summary\n\nUS market review body',
+      marketReviewPayload: {
+        kind: 'market_review',
+        region: 'us',
+        language: 'en',
+        title: 'US Market Recap',
+        sections: [
+          {
+            key: 'summary',
+            title: 'Summary',
+            markdown: 'US market review body',
+          },
+        ],
+      },
+    });
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: '大盘复盘' }));
+
+    expect(await screen.findByRole('button', { name: 'Copy Markdown Source' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Copy Plain Text' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '复制 Markdown 源码' })).not.toBeInTheDocument();
+  });
+
   it('scrolls the dashboard to market review feedback after toolbar clicks', async () => {
     vi.mocked(historyApi.getList).mockResolvedValue({
       total: 1,

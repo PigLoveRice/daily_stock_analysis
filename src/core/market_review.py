@@ -292,6 +292,9 @@ def _render_market_review_payload_markdown(
 def _render_market_review_payload_body(payload: Dict[str, Any]) -> str:
     markets = payload.get("markets")
     if isinstance(markets, dict) and markets:
+        markdown_report = payload.get("markdown_report")
+        if isinstance(markdown_report, str) and markdown_report.strip():
+            return markdown_report.strip()
         parts = []
         for market in _MARKET_REVIEW_REGION_ORDER:
             market_payload = markets.get(market)
