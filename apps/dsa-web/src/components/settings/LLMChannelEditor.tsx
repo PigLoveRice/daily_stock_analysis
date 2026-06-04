@@ -211,11 +211,11 @@ function resolveInitialChannelApiKeySource(
   const apiKeysValue = (initialItemValueByKey.get(apiKeysKey) || '').trim();
   const apiKeyValue = (initialItemValueByKey.get(apiKeyKey) || '').trim();
 
-  if (apiKeyValue && initialItemSourceByKey.has(apiKeyKey)) {
-    return initialItemSourceByKey.get(apiKeyKey);
-  }
   if (apiKeysValue && initialItemSourceByKey.has(apiKeysKey)) {
     return initialItemSourceByKey.get(apiKeysKey);
+  }
+  if (apiKeyValue && initialItemSourceByKey.has(apiKeyKey)) {
+    return initialItemSourceByKey.get(apiKeyKey);
   }
 
   if (apiKeyValue) {
@@ -225,6 +225,33 @@ function resolveInitialChannelApiKeySource(
     return initialItemSourceByKey.get(apiKeysKey);
   }
   return initialItemSourceByKey.get(apiKeysKey) ?? initialItemSourceByKey.get(apiKeyKey);
+}
+
+function resolveInitialChannelApiKeyValue(
+  channelName: string,
+  itemValueByKey: Map<string, string>,
+  itemSourceByKey: Map<string, boolean>,
+): string {
+  const upperName = channelName.trim().toUpperCase();
+  const apiKeysKey = `LLM_${upperName}_API_KEYS`;
+  const apiKeyKey = `LLM_${upperName}_API_KEY`;
+
+  const apiKeysValue = (itemValueByKey.get(apiKeysKey) || '').trim();
+  const apiKeyValue = (itemValueByKey.get(apiKeyKey) || '').trim();
+
+  if (apiKeysValue && itemSourceByKey.has(apiKeysKey)) {
+    return apiKeysValue;
+  }
+  if (apiKeyValue && itemSourceByKey.has(apiKeyKey)) {
+    return apiKeyValue;
+  }
+  if (apiKeysValue) {
+    return apiKeysValue;
+  }
+  if (apiKeyValue) {
+    return apiKeyValue;
+  }
+  return itemValueByKey.get(apiKeysKey) || itemValueByKey.get(apiKeyKey) || '';
 }
 
 function buildChangedItemKeys(
@@ -1217,8 +1244,11 @@ function parseRuntimeConfigFromItems(items: Array<{ key: string; value: string }
   };
 }
 
-function parseChannelsFromItems(items: Array<{ key: string; value: string }>): ChannelConfig[] {
-  const itemMap = new Map(items.map((item) => [item.key, item.value]));
+function parseChannelsFromItems(
+  items: Array<{ key: string; value: string }>,
+  itemSourceByKey: Map<string, boolean> = new Map(),
+): ChannelConfig[] {
+  const itemMap = new Map(items.map((item) => [item.key.toUpperCase(), item.value]));
   const channelNames = (itemMap.get('LLM_CHANNELS') || '')
     .split(',')
     .map((segment) => segment.trim())
@@ -1235,7 +1265,7 @@ function parseChannelsFromItems(items: Array<{ key: string; value: string }>): C
       name: name.toLowerCase(),
       protocol: inferProtocol(itemMap.get(`LLM_${upperName}_PROTOCOL`) || '', baseUrl, models),
       baseUrl,
-      apiKey: itemMap.get(`LLM_${upperName}_API_KEY`) || itemMap.get(`LLM_${upperName}_API_KEYS`) || '',
+      apiKey: resolveInitialChannelApiKeyValue(name, itemMap, itemSourceByKey),
       models: rawModels,
       enabled: parseEnabled(itemMap.get(`LLM_${upperName}_ENABLED`)),
     };
@@ -1308,9 +1338,6 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
   onSaved,
   disabled = false,
 }) => {
-  const initialChannels = useMemo(() => parseChannelsFromItems(items), [items]);
-  const initialNames = useMemo(() => initialChannels.map((channel) => channel.name), [initialChannels]);
-  const initialRuntimeConfig = useMemo(() => parseRuntimeConfigFromItems(items), [items]);
   const initialItemSourceByKey = useMemo(() => {
     const sourceByKey = new Map<string, boolean>();
     for (const item of items) {
@@ -1333,6 +1360,12 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
     }
     return sourceByKey;
   }, [items]);
+  const initialChannels = useMemo(
+    () => parseChannelsFromItems(items, initialItemSourceByKey),
+    [items, initialItemSourceByKey],
+  );
+  const initialNames = useMemo(() => initialChannels.map((channel) => channel.name), [initialChannels]);
+  const initialRuntimeConfig = useMemo(() => parseRuntimeConfigFromItems(items), [items]);
   const savedItemMap = useMemo(() => new Map(items.map((item) => [item.key.toUpperCase(), item.value])), [items]);
   const hasLitellmConfig = useMemo(
     () => items.some((item) => item.key === 'LITELLM_CONFIG' && item.value.trim().length > 0),
