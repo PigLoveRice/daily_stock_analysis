@@ -1189,39 +1189,14 @@ FastAPI provides RESTful API service for configuration management and triggering
 - **Backtest Validation** - Evaluate historical analysis accuracy, query direction win rate and simulated returns
 - **API Documentation** - Visit `/docs` for Swagger UI
 
-### Visual evidence (required for UI-facing changes)
+### Product behavior notes
 
-For review, include before/after screenshots (or equivalent accessible output) for these pages:
+For this feature, the product behavior is:
 
-- Login page (`/login`)
-- Home page (`/`)
-- Settings page (`/settings`)
-- Side navigation (home/settings)
-
-This change already includes bilingual smoke-capture evidence for login/home/settings/side-navigation pages in `apps/dsa-web/e2e/smoke.spec.ts` (`smoke-login-page-zh`, `smoke-home-page-zh`, `smoke-home-page-en`, `smoke-settings-page-zh`, `smoke-settings-page-en`, `smoke-mobile-shell-nav`) as the equivalent visual proof reference. The Web-side commands run for this PR were (for PR evidence in description):
-
-- `cd apps/dsa-web && npm ci --ignore-scripts`
-- `cd apps/dsa-web && npm run lint`
-- `cd apps/dsa-web && npm run build`
-- `cd apps/dsa-web && npm run test -- src/App.test.tsx src/contexts/__tests__/UiLanguageContext.test.tsx src/hooks/__tests__/useSystemConfig.test.tsx`
-- `cd apps/dsa-web && npm run test:smoke`
-
-Note: The first four commands pass locally (`npm ci --ignore-scripts`, `npm run lint`, `npm run build`, and the targeted Vitest run). `npm run test:smoke` cannot complete in this execution environment because the Playwright webServer startup times out: the frontend `vite` dev server bind on `127.0.0.1:4173` is blocked by sandbox `EPERM`, and the environment also blocks Playwright browser download/retrieval. Please run the following commands in a reachable environment and attach the resulting screenshots to PR review:
-
-- `python main.py --webui-only --host 127.0.0.1 --port 8000`
-- `cd apps/dsa-web && npm run dev -- --host 127.0.0.1 --port 4173`
-- `cd apps/dsa-web && npm run test:smoke`
-
-Reference captures: `smoke-login-page-zh`, `smoke-home-page-zh`, `smoke-home-page-en`, `smoke-settings-page-zh`, `smoke-settings-page-en`, `smoke-mobile-shell-nav`.
-
-Compatibility clarification (Issue #777):
-
-- `dsa.uiLanguage` only changes UI locale persistence and copy rendering in the browser, and does not modify runtime persistence/cleanup/migration semantics for `provider`, `model`, or `base_url`.
-- The compatibility warnings seen in structural checks for this change are read-path-only signals (environmental false positives) and do not change runtime `provider/model/base_url` routing or migration logic; rollback is `revert this PR`.
-- Evidence trail added for this scope: `apps/dsa-web/src/contexts/__tests__/UiLanguageContext.test.tsx`, `apps/dsa-web/src/hooks/__tests__/useSystemConfig.test.tsx`, and backend tests  
-  `tests/test_system_config_service.py::test_runtime_env_fallback_does_not_override_saved_provider_and_base_url_settings`,  
-  `tests/test_system_config_service.py::test_get_config_runtime_env_fallback_does_not_persist_llm_fields_on_save`,  
-  `tests/test_system_config_service.py::test_get_config_uses_runtime_env_as_display_fallback`.
+- UI language is independent from report language: `dsa.uiLanguage` (browser persistence) controls shell/login/settings text, while `REPORT_LANGUAGE` controls report text and report-page fixed copy (`zh`/`en`).
+- `dsa.uiLanguage` follows local persistence -> browser language -> default `zh`.
+- This change only adds request-scope report language override parameters; it does not modify `provider`, `model`, `base_url`, or migration/cleanup behavior.
+- PR-level verification output, screenshots, and command logs are maintained in PR description, not in this usage guide.
 
 ### API Endpoints
 
@@ -1245,8 +1220,10 @@ Compatibility clarification (Issue #777):
 > Note: `POST /api/v1/analysis/analyze` supports only one stock when `async_mode=false`; batch `stock_codes` requires `async_mode=true`. The async `202` response returns a single `task_id` for one stock, or an `accepted` / `duplicates` summary for batch requests.
 > Note: `POST /api/v1/analysis/analyze` accepts `skills` as an array of strategy IDs; if omitted, server defaults are used. The legacy field `strategies` is still accepted for backward compatibility.
 > Note: `POST /api/v1/analysis/analyze` accepts `analysis_phase=auto|premarket|intraday|postmarket`, defaulting to `auto`. Non-`auto` only overrides the phase and derived phase flags for this run; it does not rewrite real trading-calendar timestamps. Accepted responses, in-memory task status, task lists, and SSE echo the requested phase, while the final report phase remains `report.meta.market_phase_summary.phase`.
+> Note: `POST /api/v1/analysis/analyze` accepts `report_language=zh|en` (legacy-compatible alias `reportLanguage`). When omitted, it falls back to global `REPORT_LANGUAGE`. This parameter is request-scoped only and influences report output language for this run, including `report.meta.report_language` in responses.
 > Note: The Web Home page exposes an explicit strategy selector. When users do not pick one, `skills` is not sent and legacy behavior is preserved; when selected, it is passed through to this endpoint and persisted in task status/history snapshots.
 > Note: `POST /api/v1/analysis/market-review` follows the same runtime configuration path as CLI/Bot market review (`GeminiAnalyzer(config=...)`, search setup, and prompt/rendering pipeline). The provider compatibility path prioritizes `litellm_model` and `llm_model_list`, then falls back to existing legacy keys (`GEMINI_*`, `OPENAI_*`, `ANTHROPIC_*`, `DEEPSEEK_*`) when those are not set; provider names, Base URL, and LiteLLM routing semantics are otherwise unchanged.
+> Note: `POST /api/v1/analysis/market-review` also accepts `report_language=zh|en` / `reportLanguage` to set report language for that request. If omitted, it falls back to global `REPORT_LANGUAGE`; Bot/CLI/manual `/market-review` calls keep using global config and do not carry request-level override.
 > Audit note: priority and fallback are defined by `Config._load_from_env()` in `src/config.py` (`LITELLM_CONFIG` > `LLM_CHANNELS` > legacy). Regression coverage is in `tests/test_llm_channel_config.py` (configuration source parsing) and `tests/test_market_review_runtime.py` (shared runtime assembly). The endpoint lock is process/host-level only; multi-instance deployments still need external distributed idempotency controls.
 > Note: Once `/api/v1/analysis/market-review` completes, the report is persisted with `report_type=market_review`; open `/api/v1/history` and `/api/v1/history/{record_id}` (or Markdown history endpoints) to view it directly without re-running analysis.
 > Note: `/api/v1/analysis/market-review` responses and persisted history include a structured `market_review_payload` with fields like `market_scope`, `sections`, `sectors`, `news`, `market_light`, `indices`, etc. Web rendering and history detail use the same structure and fall back to raw `markdown_report` only if the structure is unavailable.

@@ -1358,37 +1358,13 @@ FastAPI 提供 RESTful API 服务，支持配置管理和触发分析。
 - 📈 **回测验证** - 评估历史分析准确率，查询方向胜率与模拟收益
 - 🔗 **API 文档** - 访问 `/docs` 查看 Swagger UI
 
-### 可视化验收说明（与本变更相关）
+### 与本变更相关的产品行为
 
-本次改动涉及浏览器界面文案，建议在 PR 评审中附上以下页面的中英文切换截图：
-
-- 登录页（`/login`）
-- 首页（`/`）
-- 设置页（`/settings`）
-- 侧边导航（首页/设置页）
-
-本次改动已在 `apps/dsa-web/e2e/smoke.spec.ts` 中覆盖登录页、首页、设置页与侧边导航的中英文截图（`smoke-login-page-zh`、`smoke-home-page-zh`、`smoke-home-page-en`、`smoke-settings-page-zh`、`smoke-settings-page-en`、`smoke-mobile-shell-nav`），用于等价可视证据。本轮已执行的 Web 验证命令如下（对应可附到 PR 描述）：
-
-- `cd apps/dsa-web && npm ci --ignore-scripts`
-- `cd apps/dsa-web && npm run lint`
-- `cd apps/dsa-web && npm run build`
-- `cd apps/dsa-web && npm run test -- src/App.test.tsx src/contexts/__tests__/UiLanguageContext.test.tsx src/hooks/__tests__/useSystemConfig.test.tsx`
-- `cd apps/dsa-web && npm run test:smoke`
-
-说明：命令中前四项通过（`npm ci --ignore-scripts`、`npm run lint`、`npm run build`、`npm run test -- ...`）。`npm run test:smoke` 当前环境无法完成：`config.webServer` 启动阶段超时（前端服务器监听 `127.0.0.1:4173` 被沙箱权限拒绝 `EPERM`），且当前环境不具备可达 Playwright 浏览器下载链路。请在可达环境中使用以下命令补充验证并附带截图：
-
-- `python main.py --webui-only --host 127.0.0.1 --port 8000`
-- `cd apps/dsa-web && npm run dev -- --host 127.0.0.1 --port 4173`
-- `cd apps/dsa-web && npm run test:smoke`
-
-截图参考名：`smoke-login-page-zh`、`smoke-home-page-zh`、`smoke-home-page-en`、`smoke-settings-page-zh`、`smoke-settings-page-en`、`smoke-mobile-shell-nav`。
-
-兼容性澄清（Issue #777）：
-
-- `dsa.uiLanguage` 仅影响 WebUI 界面语言状态与文案渲染，不会改写 `provider`、`model`、`base_url` 运行时配置迁移与清理语义；
-- 本改动相关的结构化检测命中属于读取侧验证告警（非运行时语义漂移），不改动 `provider/model/base_url` 的运行时读写链路；回退路径为 revert 本次变更或回滚到历史运行行为。
-- 回归证据补充：`apps/dsa-web/src/contexts/__tests__/UiLanguageContext.test.tsx`、`apps/dsa-web/src/hooks/__tests__/useSystemConfig.test.tsx`、以及后端 `tests/test_system_config_service.py` 中  
-  `test_runtime_env_fallback_does_not_override_saved_provider_and_base_url_settings`、`test_get_config_runtime_env_fallback_does_not_persist_llm_fields_on_save`、`test_get_config_uses_runtime_env_as_display_fallback`。
+- Web 语言状态采用两层机制：`dsa.uiLanguage`（浏览器持久化）与 `REPORT_LANGUAGE`（报告输出）解耦。  
+  - `dsa.uiLanguage` 只决定 WebUI 文案与导航语言（`zh` / `en`），取值优先级为本地持久化值 -> 浏览器语言 -> 默认 `zh`。  
+  - `REPORT_LANGUAGE` 控制报告文本、股票简称本地化与报告页固定文案（`zh` / `en`）。
+- 页面语言切换为用户体验增强，不属于回归验证证据记录范围；截图与命令请按 PR 流程在 PR 描述中单独维护。
+- 本改动仅新增请求级报告语言覆盖参数，不改变 `provider`/`model`/`base_url` 的配置迁移与清理逻辑。
 
 ### API 接口
 
@@ -1414,8 +1390,10 @@ FastAPI 提供 RESTful API 服务，支持配置管理和触发分析。
 > 说明：`POST /api/v1/analysis/analyze` 在 `async_mode=false` 时仅支持单只股票；批量 `stock_codes` 需使用 `async_mode=true`。异步 `202` 响应对单股返回 `task_id`，对批量返回 `accepted` / `duplicates` 汇总结构。
 > 说明：`POST /api/v1/analysis/analyze` 支持使用 `skills` 传入策略 skill ID 列表；若未传则按服务端默认策略执行。为兼容历史调用，`strategies` 字段仍作为兼容别名保留。
 > 说明：`POST /api/v1/analysis/analyze` 支持 `analysis_phase=auto|premarket|intraday|postmarket`，默认 `auto`。非 `auto` 只覆盖本次分析阶段与派生阶段标记，不改写真实交易日历时间；accepted response、内存 task status、任务列表和 SSE 会回显请求阶段，最终报告阶段以 `report.meta.market_phase_summary.phase` 为准。
+> 说明：`POST /api/v1/analysis/analyze` 支持 `report_language=zh|en`，并兼容 `reportLanguage` 作为别名；未传时回退到全局 `REPORT_LANGUAGE`（或环境中的 `Config.report_language`）。该字段仅影响本次分析的报告文本、`report.meta.report_language` 与持久化展示，不会持久化为运行时配置。
 > 说明：Web 侧首页策略下拉为显式可选策略入口。用户未手动选择时不会携带 `skills`，与历史客户端行为一致；选择策略后将透传到该接口并在任务状态与历史快照中保留。
 > 说明：`POST /api/v1/analysis/market-review` 采用后端与 CLI/Bot 共用的配置路径（`GeminiAnalyzer(config=...)` 与同样的搜索/提示词构造入口）。Provider 兼容路由会优先识别并使用 `litellm_model`、`llm_model_list`，若未配置则回退 legacy `GEMINI_*`、`OPENAI_*`、`ANTHROPIC_*`、`DEEPSEEK_*` 键；不会新增/调整 provider、Base URL 或 LiteLLM 路由语义。
+> 说明：`POST /api/v1/analysis/market-review` 额外支持 `report_language=zh|en`（支持别名 `reportLanguage`）。未传时同样回退到全局 `REPORT_LANGUAGE`。该参数仅影响本次复盘报告文本与结构化返回字段中的语言相关内容；Bot、schedule、CLI 或按钮触发的 `main.py --market-review` 仍沿用全局配置，未新增请求级覆盖能力。
 > 审计依据：优先级与回退语义以 `src/config.py` 的 `Config._load_from_env()` 为准（`LITELLM_CONFIG` > `LLM_CHANNELS` > legacy）。配套回归见 `tests/test_llm_channel_config.py`（配置源解析）与 `tests/test_market_review_runtime.py`（共享装配路径）。该接口当前仅提供单进程/单机级防重复能力，若为多实例部署需通过外部任务队列或分布式锁补齐全局幂等。
 > 说明：`POST /api/v1/analysis/market-review` 触发后，报告会以 `report_type=market_review` 写入历史库；你可直接查询 `/api/v1/history` 或 `/api/v1/history/{record_id}` 获取历史 Markdown，避免再次触发分析重算。
 > 说明：历史列表新增 `report_type` 查询参数；通过 `stock_code=MARKET&report_type=market_review` 可单独读取大盘复盘历史集合，与普通个股历史逻辑完全隔离。
