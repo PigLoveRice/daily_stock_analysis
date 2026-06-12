@@ -15,8 +15,16 @@ from tests.litellm_stub import ensure_litellm_stub
 
 ensure_litellm_stub()
 
+_ENV_BEFORE_MAIN_IMPORT = dict(os.environ)
 import main
 from src.config import Config
+
+_MAIN_IMPORT_ENV_ADDITIONS = frozenset(set(os.environ) - set(_ENV_BEFORE_MAIN_IMPORT))
+_MAIN_IMPORT_ENV_OVERRIDES = {
+    key: value
+    for key, value in _ENV_BEFORE_MAIN_IMPORT.items()
+    if os.environ.get(key) != value
+}
 
 
 class _DummyConfig(SimpleNamespace):
@@ -52,6 +60,10 @@ class MainScheduleModeTestCase(unittest.TestCase):
         os.chdir(self.original_cwd)
         Config.reset_instance()
         self.env_patch.stop()
+        for key in _MAIN_IMPORT_ENV_ADDITIONS:
+            os.environ.pop(key, None)
+        for key, value in _MAIN_IMPORT_ENV_OVERRIDES.items():
+            os.environ[key] = value
         self.temp_dir.cleanup()
 
     def _make_args(self, **overrides):
