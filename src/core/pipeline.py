@@ -113,7 +113,7 @@ class StockAnalysisPipeline:
         analysis_skills: Optional[List[str]] = None,
         analysis_phase: str = "auto",
         portfolio_context: Optional[Dict[str, Any]] = None,
-        daily_market_context_enabled: bool = False,
+        daily_market_context_enabled: Optional[bool] = None,
         daily_market_context_allow_generate: bool = True,
     ):
         """
@@ -136,7 +136,11 @@ class StockAnalysisPipeline:
         self.analysis_skills = list(analysis_skills) if analysis_skills is not None else None
         self.analysis_phase = analysis_phase or "auto"
         self.portfolio_context = dict(portfolio_context) if isinstance(portfolio_context, dict) else None
-        self.daily_market_context_enabled = daily_market_context_enabled
+        self.daily_market_context_enabled = (
+            bool(getattr(self.config, "daily_market_context_enabled", False))
+            if daily_market_context_enabled is None
+            else bool(daily_market_context_enabled)
+        )
         self.daily_market_context_allow_generate = daily_market_context_allow_generate
         
         # 初始化各模块

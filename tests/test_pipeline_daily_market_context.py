@@ -16,6 +16,48 @@ from src.enums import ReportType
 from src.services.daily_market_context import DailyMarketContext
 
 
+def _pipeline_config(*, daily_market_context_enabled: bool) -> SimpleNamespace:
+    return SimpleNamespace(
+        max_workers=1,
+        save_context_snapshot=False,
+        bocha_api_keys=[],
+        tavily_api_keys=[],
+        anspire_api_keys=[],
+        brave_api_keys=[],
+        serpapi_keys=[],
+        minimax_api_keys=[],
+        searxng_base_urls=[],
+        searxng_public_instances_enabled=False,
+        news_max_age_days=3,
+        news_strategy_profile="short",
+        enable_realtime_quote=False,
+        realtime_source_priority=[],
+        enable_chip_distribution=False,
+        social_sentiment_api_key="",
+        social_sentiment_api_url="https://example.invalid/social",
+        daily_market_context_enabled=daily_market_context_enabled,
+    )
+
+
+def _build_initialized_pipeline(
+    config: SimpleNamespace,
+    **kwargs,
+) -> StockAnalysisPipeline:
+    search_service = MagicMock()
+    search_service.is_available = False
+    social_sentiment_service = MagicMock()
+    social_sentiment_service.is_available = False
+
+    with patch("src.core.pipeline.get_db", return_value=MagicMock()), \
+         patch("src.core.pipeline.DataFetcherManager", return_value=MagicMock()), \
+         patch("src.core.pipeline.StockTrendAnalyzer", return_value=MagicMock()), \
+         patch("src.core.pipeline.GeminiAnalyzer", return_value=MagicMock()), \
+         patch("src.core.pipeline.NotificationService", return_value=MagicMock()), \
+         patch("src.core.pipeline.SearchService", return_value=search_service), \
+         patch("src.core.pipeline.SocialSentimentService", return_value=social_sentiment_service):
+        return StockAnalysisPipeline(config=config, **kwargs)
+
+
 def _market_context() -> DailyMarketContext:
     return DailyMarketContext(
         region="cn",
@@ -24,6 +66,31 @@ def _market_context() -> DailyMarketContext:
         risk_tags=["high_risk", "low_position_cap"],
         source="analysis_history",
     )
+
+
+def test_pipeline_constructor_defaults_daily_context_flag_from_config() -> None:
+    pipeline = _build_initialized_pipeline(
+        _pipeline_config(daily_market_context_enabled=True)
+    )
+
+    assert pipeline.daily_market_context_enabled is True
+
+
+def test_pipeline_constructor_keeps_config_disabled_by_default() -> None:
+    pipeline = _build_initialized_pipeline(
+        _pipeline_config(daily_market_context_enabled=False)
+    )
+
+    assert pipeline.daily_market_context_enabled is False
+
+
+def test_pipeline_constructor_explicit_flag_overrides_config() -> None:
+    pipeline = _build_initialized_pipeline(
+        _pipeline_config(daily_market_context_enabled=True),
+        daily_market_context_enabled=False,
+    )
+
+    assert pipeline.daily_market_context_enabled is False
 
 
 def test_pipeline_loads_daily_market_context_when_market_review_enabled() -> None:
