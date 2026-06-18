@@ -476,12 +476,43 @@ def _run_market_review_with_shared_lock(
         logger.warning("大盘复盘正在执行中，跳过本次大盘复盘")
         return None
 
+    # 大盘复盘超时保护（默认 20 分钟），防止数据源阻塞导致调度器卡死
+    import threading
+
+    market_review_timeout = int(os.getenv("MARKET_REVIEW_TIMEOUT_SECONDS", "1200"))
+    result_holder: Dict[str, Optional[str]] = {"value": None}
+    error_holder: Dict[str, Optional[str]] = {"message": None}
+
+    def _run_with_tracking() -> None:
+        try:
+            result_holder["value"] = run_market_review_func(**kwargs)
+        except Exception as e:
+            logger.exception(f"大盘复盘执行失败: {e}")
+            error_holder["message"] = str(e)
+
+    review_thread = threading.Thread(
+        target=_run_with_tracking,
+        daemon=True,
+        name="market-review",
+    )
+    review_thread.start()
+    review_thread.join(timeout=market_review_timeout)
+
     try:
-        params = dict(kwargs)
-        params.setdefault("config", config)
-        return run_market_review_func(**params)
+        if review_thread.is_alive():
+            logger.error(
+                "大盘复盘执行超时（%d 秒），强制释放锁并跳过。"
+                "后台线程将继续运行但不再阻塞调度器。",
+                market_review_timeout,
+            )
+            return None
     finally:
         release_market_review_lock(lock_token)
+
+    if error_holder["message"]:
+        logger.error("大盘复盘执行异常，已释放锁: %s", error_holder["message"])
+
+    return result_holder["value"]
 
 
 def _is_multi_market_region(region: str) -> bool:
@@ -1293,12 +1324,16 @@ def main() -> int:
                     "name": "agent_event_monitor",
                 })
 
+            # 读取任务超时配置（默认 30 分钟）
+            task_timeout = int(os.getenv("TASK_TIMEOUT_SECONDS", "1800"))
+
             run_with_schedule(
                 task=scheduled_task,
                 schedule_time=config.schedule_time,
                 run_immediately=should_run_immediately,
                 background_tasks=background_tasks,
                 schedule_time_provider=schedule_time_provider,
+                task_timeout_seconds=task_timeout,
             )
             return 0
 

@@ -67,12 +67,15 @@ class Scheduler:
         self,
         schedule_time: str = "18:00",
         schedule_time_provider: Optional[Callable[[], str]] = None,
+        task_timeout_seconds: int = 1800,
     ):
         """
         初始化调度器
 
         Args:
             schedule_time: 每日执行时间，格式 "HH:MM"
+            task_timeout_seconds: 单次任务最大执行时间（秒），默认 30 分钟。
+                超时后调度器继续运行，不会因任务卡死而阻塞后续调度。
         """
         try:
             import schedule
@@ -83,11 +86,13 @@ class Scheduler:
 
         self.schedule_time = schedule_time
         self._schedule_time_provider = schedule_time_provider
+        self._task_timeout_seconds = max(60, int(task_timeout_seconds))
         self.shutdown_handler = GracefulShutdown()
         self._task_callback: Optional[Callable] = None
         self._daily_job: Optional[Any] = None
         self._background_tasks: List[Dict[str, Any]] = []
         self._running = False
+        self._task_thread: Optional[threading.Thread] = None
 
     def set_daily_task(self, task: Callable, run_immediately: bool = True):
         """
@@ -171,21 +176,59 @@ class Scheduler:
             logger.info("更新后的下次执行时间: %s", self._get_next_run_time())
 
     def _safe_run_task(self):
-        """安全执行任务（带异常捕获）"""
+        """安全执行任务（带超时保护和异常捕获）
+
+        任务在独立线程中执行，超时后调度器继续运行，
+        不会因网络卡死等阻塞整个调度循环。
+        同时防止上一轮任务未完成时重复触发。
+        """
         if self._task_callback is None:
             return
 
-        try:
-            logger.info("=" * 50)
-            logger.info(f"定时任务开始执行 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-            logger.info("=" * 50)
+        # 防止任务重叠：上一轮还未结束则跳过
+        if self._task_thread is not None and self._task_thread.is_alive():
+            logger.warning(
+                "上一轮定时任务尚未完成（已运行 %.0f 秒），跳过本次执行",
+                time.time() - getattr(self, '_task_start_time', time.time()),
+            )
+            return
 
-            self._task_callback()
+        task_error: Dict[str, Optional[str]] = {"message": None}
+        task_completed = threading.Event()
 
-            logger.info(f"定时任务执行完成 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        def _run_with_tracking() -> None:
+            try:
+                logger.info("=" * 50)
+                logger.info(f"定时任务开始执行 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+                logger.info("=" * 50)
 
-        except Exception as e:
-            logger.exception(f"定时任务执行失败: {e}")
+                self._task_callback()
+
+                logger.info(f"定时任务执行完成 - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
+            except Exception as e:
+                logger.exception(f"定时任务执行失败: {e}")
+                task_error["message"] = str(e)
+            finally:
+                task_completed.set()
+
+        self._task_start_time = time.time()
+        self._task_thread = threading.Thread(
+            target=_run_with_tracking,
+            daemon=True,
+            name="scheduler-daily-task",
+        )
+        self._task_thread.start()
+        self._task_thread.join(timeout=self._task_timeout_seconds)
+
+        if not task_completed.is_set():
+            elapsed = time.time() - self._task_start_time
+            logger.error(
+                "定时任务执行超时（%d 秒 > 限制 %d 秒），调度器将继续运行。"
+                "任务线程仍在后台运行，下次定时触发时若未完成将自动跳过。",
+                int(elapsed),
+                self._task_timeout_seconds,
+            )
 
     def add_background_task(
         self,
@@ -303,6 +346,7 @@ class Scheduler:
     def stop(self):
         """停止调度器"""
         self._running = False
+        # 不等待后台任务线程 —— daemon 线程会随进程退出自动清理
 
 
 def run_with_schedule(
@@ -311,6 +355,7 @@ def run_with_schedule(
     run_immediately: bool = True,
     background_tasks: Optional[List[Dict[str, Any]]] = None,
     schedule_time_provider: Optional[Callable[[], str]] = None,
+    task_timeout_seconds: int = 1800,
 ):
     """
     便捷函数：使用定时调度运行任务
@@ -324,10 +369,13 @@ def run_with_schedule(
             和 `run_immediately`。`interval_seconds` 单位为秒。
         schedule_time_provider: 可选的时间提供器；调度器每轮检查前会读取，
             当返回值变化时自动重建 daily job。
+        task_timeout_seconds: 单次任务最大执行时间（秒），默认 30 分钟。
+            超时后调度器继续运行，不会因任务卡死而阻塞后续调度。
     """
     scheduler = Scheduler(
         schedule_time=schedule_time,
         schedule_time_provider=schedule_time_provider,
+        task_timeout_seconds=task_timeout_seconds,
     )
     for entry in background_tasks or []:
         scheduler.add_background_task(

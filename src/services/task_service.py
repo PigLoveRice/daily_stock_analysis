@@ -208,6 +208,16 @@ class TaskService:
                     })
 
                 logger.info(f"[TaskService] 股票 {code} 分析完成: {result.operation_advice}")
+
+                # 归档到追踪文档
+                try:
+                    from src.services.stock_tracker import archive_stock_analysis
+                    tracking = archive_stock_analysis(result)
+                    if tracking and not tracking.error:
+                        logger.info("[TaskService] 追踪文档已更新: %s", tracking.doc_url)
+                except Exception as track_err:
+                    logger.warning("[TaskService] 追踪归档失败（不影响主流程）: %s", track_err)
+
                 return {"success": True, "task_id": task_id, "result": result_data}
             else:
                 fail_message = "分析返回空结果"
