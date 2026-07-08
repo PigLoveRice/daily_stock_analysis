@@ -725,20 +725,6 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": ["secret_value", "comma_separated_keys"],
     },
-    "SERPAPI_API_KEYS": {
-        "title": "SerpAPI Keys",
-        "description": "Comma-separated SerpAPI keys.",
-        "category": "data_source",
-        "data_type": "string",
-        "ui_control": "password",
-        "is_sensitive": True,
-        "is_required": False,
-        "is_editable": True,
-        "default_value": None,
-        "options": [],
-        "validation": {"multi_value": True, "delimiter": ","},
-        "display_order": 40,
-    },
     "BRAVE_API_KEYS": {
         "title": "Brave API Keys",
         "description": "Comma-separated Brave Search API keys.",
@@ -769,7 +755,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     },
     "MINIMAX_API_KEYS": {
         "title": "MiniMax API Key",
-        "description": "MiniMax API key (search priority: Bocha > Tavily > Brave > SerpAPI > MiniMax > SearXNG).",
+        "description": "MiniMax API key (search priority: Bocha > Tavily > Brave > MiniMax > SearXNG).",
         "category": "data_source",
         "data_type": "string",
         "ui_control": "password",
@@ -4146,14 +4132,6 @@ _FIELD_HELP_METADATA: Dict[str, Dict[str, Any]] = {
         ],
         "docs": _DOC_FULL_GUIDE_DATA_SOURCE,
         "warning_codes": ["secret_value"],
-    },
-    "SERPAPI_API_KEYS": {
-        "help_key": "settings.data_source.search_api_keys",
-        "examples": [
-            "SERPAPI_API_KEYS=serpapi_key_1,serpapi_key_2",
-        ],
-        "docs": _DOC_FULL_GUIDE_SEARCH,
-        "warning_codes": ["secret_value", "comma_separated_keys"],
     },
     "BRAVE_API_KEYS": {
         "help_key": "settings.data_source.search_api_keys",

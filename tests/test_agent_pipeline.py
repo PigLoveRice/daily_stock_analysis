@@ -575,7 +575,6 @@ class TestAgentResultConversion(unittest.TestCase):
             mock_cfg.bocha_api_keys = []
             mock_cfg.tavily_api_keys = []
             mock_cfg.brave_api_keys = []
-            mock_cfg.serpapi_keys = []
             mock_cfg.searxng_base_urls = []
             mock_cfg.searxng_public_instances_enabled = False
             mock_cfg.news_max_age_days = 7
@@ -1514,7 +1513,6 @@ class TestPipelineRouting(unittest.TestCase):
             mock_cfg.bocha_api_keys = []
             mock_cfg.tavily_api_keys = []
             mock_cfg.brave_api_keys = []
-            mock_cfg.serpapi_keys = []
             mock_cfg.searxng_base_urls = []
             mock_cfg.searxng_public_instances_enabled = False
             mock_cfg.news_max_age_days = 7
@@ -1560,7 +1558,6 @@ class TestPipelineRouting(unittest.TestCase):
             mock_cfg.bocha_api_keys = []
             mock_cfg.tavily_api_keys = []
             mock_cfg.brave_api_keys = []
-            mock_cfg.serpapi_keys = []
             mock_cfg.searxng_base_urls = []
             mock_cfg.searxng_public_instances_enabled = False
             mock_cfg.news_max_age_days = 7
@@ -1607,7 +1604,6 @@ class TestPipelineRouting(unittest.TestCase):
             mock_cfg.bocha_api_keys = []
             mock_cfg.tavily_api_keys = []
             mock_cfg.brave_api_keys = []
-            mock_cfg.serpapi_keys = []
             mock_cfg.searxng_base_urls = []
             mock_cfg.searxng_public_instances_enabled = False
             mock_cfg.news_max_age_days = 7
@@ -1653,7 +1649,6 @@ class TestAnalyzeWithAgentStockName(unittest.TestCase):
             mock_cfg.bocha_api_keys = []
             mock_cfg.tavily_api_keys = []
             mock_cfg.brave_api_keys = []
-            mock_cfg.serpapi_keys = []
             mock_cfg.searxng_base_urls = []
             mock_cfg.searxng_public_instances_enabled = False
             mock_cfg.news_max_age_days = 7
@@ -1730,7 +1725,6 @@ class TestAnalyzeWithAgentStockName(unittest.TestCase):
             mock_cfg.bocha_api_keys = []
             mock_cfg.tavily_api_keys = []
             mock_cfg.brave_api_keys = []
-            mock_cfg.serpapi_keys = []
             mock_cfg.searxng_base_urls = []
             mock_cfg.searxng_public_instances_enabled = False
             mock_cfg.news_max_age_days = 7
@@ -1822,7 +1816,6 @@ class TestAnalyzeWithAgentStockName(unittest.TestCase):
             mock_cfg.bocha_api_keys = []
             mock_cfg.tavily_api_keys = []
             mock_cfg.brave_api_keys = []
-            mock_cfg.serpapi_keys = []
             mock_cfg.searxng_base_urls = []
             mock_cfg.searxng_public_instances_enabled = False
             mock_cfg.news_max_age_days = 7
@@ -1927,7 +1920,6 @@ class TestAnalyzeWithAgentStockName(unittest.TestCase):
             mock_cfg.bocha_api_keys = []
             mock_cfg.tavily_api_keys = []
             mock_cfg.brave_api_keys = []
-            mock_cfg.serpapi_keys = []
             mock_cfg.searxng_base_urls = []
             mock_cfg.searxng_public_instances_enabled = False
             mock_cfg.news_max_age_days = 7
@@ -2006,7 +1998,6 @@ class TestAnalyzeWithAgentStockName(unittest.TestCase):
             mock_cfg.tavily_api_keys = []
             mock_cfg.anspire_api_keys = []
             mock_cfg.brave_api_keys = []
-            mock_cfg.serpapi_keys = []
             mock_cfg.searxng_base_urls = []
             mock_cfg.searxng_public_instances_enabled = False
             mock_cfg.news_max_age_days = 7
@@ -2777,7 +2768,6 @@ class TestSafeInt(unittest.TestCase):
             mock_cfg.bocha_api_keys = []
             mock_cfg.tavily_api_keys = []
             mock_cfg.brave_api_keys = []
-            mock_cfg.serpapi_keys = []
             mock_cfg.searxng_base_urls = []
             mock_cfg.searxng_public_instances_enabled = False
             mock_cfg.news_max_age_days = 7
@@ -2920,7 +2910,6 @@ class TestSkillActivation(unittest.TestCase):
             mock_cfg.bocha_api_keys = []
             mock_cfg.tavily_api_keys = []
             mock_cfg.brave_api_keys = []
-            mock_cfg.serpapi_keys = []
             mock_cfg.searxng_base_urls = []
             mock_cfg.searxng_public_instances_enabled = False
             mock_cfg.news_max_age_days = 7

@@ -288,7 +288,6 @@ def _has_configured_hotspot_news_source(config: Config) -> bool:
         "tavily_api_keys",
         "anspire_api_keys",
         "brave_api_keys",
-        "serpapi_api_keys",
         "minimax_api_keys",
         "searxng_base_urls",
     )
@@ -307,7 +306,6 @@ def _build_hotspot_event_routes_from_search(topic: str, config: Config) -> List[
             tavily_keys=getattr(config, "tavily_api_keys", None),
             anspire_keys=getattr(config, "anspire_api_keys", None),
             brave_keys=getattr(config, "brave_api_keys", None),
-            serpapi_keys=getattr(config, "serpapi_api_keys", None),
             minimax_keys=getattr(config, "minimax_api_keys", None),
             searxng_base_urls=getattr(config, "searxng_base_urls", None),
             searxng_public_instances_enabled=False,

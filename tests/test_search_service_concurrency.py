@@ -235,7 +235,6 @@ class SearchServiceConcurrencyTestCase(unittest.TestCase):
             bocha_api_keys=[],
             tavily_api_keys=[],
             brave_api_keys=[],
-            serpapi_keys=[],
             minimax_api_keys=[],
             searxng_base_urls=[],
             searxng_public_instances_enabled=False,

@@ -148,7 +148,6 @@ Dockerfile 已采用多阶段构建，前端会在镜像构建时自动打包。
 | `AIHUBMIX_KEY` | AIHubMix API 密钥（一 Key 多模型，推荐） |
 | `GEMINI_API_KEY` | Gemini API 密钥 |
 | `OPENAI_API_KEY` | OpenAI 兼容 API 密钥 |
-| `SERPAPI_API_KEYS` | SerpAPI 密钥（推荐） |
 | `TAVILY_API_KEYS` | Tavily API 密钥（用逗号分隔） |
 | `BOCHA_API_KEYS` | Bocha API 密钥（用逗号分隔） |
 | `BRAVE_API_KEYS` | Brave Search API 密钥（用逗号分隔） |
